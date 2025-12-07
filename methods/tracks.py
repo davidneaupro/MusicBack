@@ -98,13 +98,15 @@ def epuration(string, scenario):
         return re.sub(r'\s*\[.*?\]', '', string)
 
 def loadHistoriqueRoute(user, ClientAPI):
+    print(user)
     response = (
         ClientAPI.table("UserMusic")
-        .select("*")
+        .select("*, StatMusic3(id_yt, Image, Album)")
         .eq("User", user)
-        .order("created_at")
+        .order("created_at", desc=True)
         .execute()
     )
+    [print(i) for i in response.data]
     return response.data
 
 def loadReplayRoute(user, ClientAPI):

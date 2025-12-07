@@ -108,6 +108,10 @@ def insertMusic():
         .eq("id_yt", id_yt)
         .execute()
     )
+
+    if "img" in payload:
+        img = payload["img"]
+
     print(f"SELECT * FROM public.\"StatMusic3\" WHERE id_yt='{id_yt}'")
     #app.cur.execute(f"SELECT * FROM public.\"StatMusic3\" WHERE id_yt='{id_yt}'")
     if (len(response.data)== 0):
@@ -118,7 +122,7 @@ def insertMusic():
         
         response = (
             ClientAPI.table("StatMusic3")
-            .insert({"id_yt": id_yt, "views" : 1, "Title": title, "Artist": artist, "Album": album})
+            .insert({"id_yt": id_yt, "views" : 1, "Title": title, "Artist": artist, "Album": album, "Image": img})
             .execute()
         )
         #app.cur.execute(f"INSERT INTO public.\"StatMusic3\" (id_yt, views, \"Title\", \"Artist\", \"Album\") VALUES ('{id_yt}', 1, '{title.replace("'", '"')}', '{artist.replace("'", '"')}', '{album.replace("'", '"')}')")
@@ -209,7 +213,7 @@ def insertDataVideoIntoDBB(videos):
             if (len(response.data)) == 0:
                     response = (
                         ClientAPI.table("StatMusic3")
-                        .insert({"id_yt": video["id"], "views" : 0, "Title": video["title"], "Artist": video["artist"], "Album": video["album"]})
+                        .insert({"id_yt": video["id"], "views" : 0, "Title": video["title"], "Artist": video["artist"], "Album": video["album"], "Image": video["img"]})
                         .execute()
                     )
                     #app.cur.execute(f"INSERT INTO public.\"StatMusic3\" (id_yt, views, \"Title\", \"Artist\", \"Album\") VALUES ('{video["id"]}', 0, '{video["title"].replace("'", '"')}', '{video["artist"].replace("'", '"')}', '{video["album"].replace("'", '"')}')")
