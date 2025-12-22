@@ -39,7 +39,6 @@ def getTrackSearch(searchStr):
         title = r.json()["results"]["trackmatches"]["track"][i]["name"].split('-')[1].lstrip()
 
 
-    #[print(r.json()["results"]["trackmatches"]["track"][i]) for i in range(len(r.json()["results"]["trackmatches"]["track"]))]
     print("artist :", artist)
     print("title :", title)
     return artist, title
@@ -58,6 +57,18 @@ def getTrackSearchDeezer(searchStr):
     album = r.json()["data"][0]["album"]["title"]
 
     return artist, title, album
+
+def getTrackSearchDeezerAll(searchStr):
+    print("getTrackSearch searchStr: ", searchStr)
+    result = []
+    r = requests.get('https://api.deezer.com/search?q=' + searchStr)
+    for music in r.json()["data"]:
+        title = music["title"]
+        artist = music["artist"]["name"]
+        album = music["album"]["title"]
+        result.append({"Title": title, "Artist": artist, "Album": album})
+    [print(i) for i in result]
+    return result
     
 def listenMusica(id_yt, click, title, artist, user, app, ClientAPI):
     response = (
@@ -67,8 +78,6 @@ def listenMusica(id_yt, click, title, artist, user, app, ClientAPI):
         .eq("User", user)
         .execute()
     )
-    #app.cur.execute(f"SELECT * FROM public.\"UserMusic\" WHERE id_yt='{id_yt}' AND \"User\"='{user}'")
-    #if len(app.cur.fetchall())== 0:
     if len(response.data)== 0:
         print("Adding to db")
         response = (
@@ -76,19 +85,13 @@ def listenMusica(id_yt, click, title, artist, user, app, ClientAPI):
             .insert({"id_yt": id_yt, "User" : user, "noClicked": 0, "noViews": 1, "Title": title, "Artist": artist})
             .execute()
         )
-        #app.cur.execute(f"INSERT INTO public.\"UserMusic\" (id_yt, \"User\", \"noClicked\", \"noViews\", \"Title\", \"Artist\") VALUES ('{id_yt}', '{user}', 0, 1, '{title.replace("'", '"')}', '{artist.replace("'", '"')}')")
-        #app.conn.commit()
     else:
         print("increment noViews")
         updateIncrement("UserMusic", "noViews", id_yt, user, ClientAPI)
-        #app.cur.execute(f"UPDATE public.\"UserMusic\" SET \"noViews\" = \"noViews\" + 1 WHERE id_yt='{id_yt}' AND \"User\"='{user}'")
-        #app.conn.commit()
     
     if click:
         print("increment noClicked")
         updateIncrement("UserMusic", "noClicked", id_yt, user, ClientAPI)
-        #app.cur.execute(f"UPDATE public.\"UserMusic\" SET \"noClicked\" = \"noClicked\" + 1 WHERE id_yt='{id_yt}' AND \"User\"='{user}'")
-        #app.conn.commit()
     return 'OK'
 
 def epuration(string, scenario):

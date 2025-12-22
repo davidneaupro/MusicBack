@@ -5,7 +5,7 @@ import json
 import threading
 import psycopg2
 import os
-from methods.tracks import getTrackSearchDeezer, listenMusica, loadHistoriqueRoute, loadReplayRoute
+from methods.tracks import getTrackSearchDeezer, getTrackSearchDeezerAll, listenMusica, loadHistoriqueRoute, loadReplayRoute
 from googleapiclient.discovery import build
 from flask import Flask, request, jsonify
 from flask_bcrypt import Bcrypt
@@ -13,6 +13,10 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from datetime import timedelta
 import os
 from supabase import create_client
+from ytmusicapi import YTMusic
+import time
+
+yt = YTMusic()  # pas d'auth nécessaire pour juste chercher
 
 app = Flask(__name__)
 app.config['JWT_SECRET_KEY'] = 'super-secret-key'
@@ -30,12 +34,6 @@ DATABASE_URL = "https://qtkheteiebuzzedvlrtn.supabase.co"
 API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0a2hldGVpZWJ1enplZHZscnRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzU3MTIsImV4cCI6MjA3OTkxMTcxMn0.vp-JoA-6T-kpOahwI__SwKXVUyaxF82LPfnyQA7ZGy8"
 
 ClientAPI = create_client(DATABASE_URL, API_KEY)
-
-#conn = psycopg2.connect(DATABASE_URL)
-#app.conn = conn
-#app.cur = conn.cursor()
-#conn.autocommit = True  # plus besoin de rollback
-#cur = conn.cursor()
 
 @app.post('/login')
 def login():
@@ -70,7 +68,32 @@ def profile():
 @jwt_required()
 def getSimilarTrackRoute(search):
     print(search)
-    return getSimilarTrack(search)
+    
+    similarTrack = getSimilarTrack(search)
+    Title = similarTrack["Title"]
+    Artist = similarTrack["Artist"]
+    Album = similarTrack["Album"]
+    response = (
+            ClientAPI.table("StatMusic3")
+            .select("*")
+            .eq("Title", Title)
+            .eq("Artist", Artist)
+            .execute()
+        )  
+    if len(response.data) == 0:
+        YTmusique = search1Music(Title + " - " + Artist)
+        response = (
+                    ClientAPI.table("StatMusic3")
+                    .insert({"id_yt": YTmusique["id_yt"], "views" : 0, "Title": Title, "Artist":Artist, "Album": Album, "Image": YTmusique["img"]})
+                    .execute()
+            )
+        listenMusic(YTmusique["id_yt"] , False, Title, Artist)
+        return YTmusique["id_yt"]
+    else:
+        print("already in BDD")
+        print(response.data)
+        listenMusic(response.data[0]["id_yt"] , False, Title, Artist)
+        return response.data[0]["id_yt"]
 
 @app.route('/loadHistorique/')
 @jwt_required()
@@ -86,6 +109,15 @@ def loadReplay():
 def listenMusic(id_yt, click, title, artist):
     listenMusica(id_yt, click, title, artist, get_jwt_identity(), app, ClientAPI)
     return "OK"
+
+
+def insertMusic2(id_yt, title, artist, album, img):
+    response = (
+        ClientAPI.table("StatMusic3")
+        .insert({"id_yt": id_yt, "views" : 1, "Title": title, "Artist": artist, "Album": album, "Image": img})
+        .execute()
+    )
+    return response.data
 
 # Route pour enregistrer une musique dans la bdd
 @app.route('/insertMusic/', methods = ['POST'])
@@ -148,7 +180,7 @@ def cleanName(name):
 
 @app.route('/searchYT/<searchStr>')
 @jwt_required()
-def searchYT(searchStr):
+def searchYT(searchStr, first=False):
     """
     Recherche des vidéos sur YouTube avec l'API YouTube Data v3.
     
@@ -168,6 +200,9 @@ def searchYT(searchStr):
     )
     
     resultats = requete_api.execute()
+    
+    if first:
+        return {"id_yt": resultats.get("items", [])[0]["id"]["videoId"], "img": resultats.get("items", [])[0]["snippet"]["thumbnails"]["default"]["url"] }
     
     videos = []
     for item in resultats.get("items", []):
@@ -194,31 +229,112 @@ def searchYT(searchStr):
             print(ex)
         videos.append(videoDict)
     
-    thread = threading.Thread(target=insertDataVideoIntoDBB, args=(videos,))
-    thread.start()
+    #thread = threading.Thread(target=insertDataVideoIntoDBB, args=(videos,))
+    #thread.start()
 
     return videos
+
+
+def search1Music(searchStr):
+    results = yt.search(searchStr, filter="songs", limit=10)
+    return {"id_yt": results[0].get("videoId"), "img": results[0]["thumbnails"][0].get("url")}
+
+@app.route('/getMusic/<searchStr>')
+@jwt_required()
+def getMusic(searchStr):
+    Artist = searchStr.split("-")[0]
+    Title = searchStr.split("-")[1]
+    print(Artist)
+    print(Title)
+    response = (
+            ClientAPI.table("StatMusic3")
+            .select("*")
+            .eq("Title", Title)
+            .eq("Artist", Artist)
+            .execute()
+        )  
+    if len(response.data) != 0:
+        listenMusic(response.data[0]["id_yt"] , True, Title, Artist)
+        return response.data[0]    
+    else:
+        return "Not in BDD"
+
+@app.route('/searchMusic/<searchStr>')
+@jwt_required()
+def searchMusic(searchStr):
+    musics = getTrackSearchDeezerAll(searchStr)
+    resultMusic = []
+    musicToRegistered = []
+    for music in musics:
+        print("title:", music["Title"])
+        print("artist:", music["Artist"])
+        response = (
+            ClientAPI.table("StatMusic3")
+            .select("*")
+            .eq("Title", music["Title"])
+            .eq("Artist", music["Artist"])
+            .execute()
+        )      
+        if len(response.data) == 0:
+            musicToRegistered.append(music)
+            resultMusic.append(prepaMusic(music, withYTID=False))
+        else:
+            print("already in BDD")
+            print(response.data)
+            resultMusic.append(prepaMusic(response.data[0]))
+    
+    thread = threading.Thread(target=insertDataVideoIntoDBB, args=(musicToRegistered,))
+    thread.start()
+    
+    return resultMusic
+    
+def prepaMusic(music, YTmusique={}, withYTID=True):
+    print(music)
+    print(YTmusique)
+
+    videoDict = {}
+
+    if withYTID:
+        if YTmusique:
+            videoDict["img"] = YTmusique["img"]
+        else:
+            videoDict["img"] = music["Image"]
+
+        if YTmusique:
+            video_id = YTmusique["id_yt"]
+        else:
+            video_id = music["id_yt"]
+        videoDict["url"] = f"https://www.youtube.com/watch?v={video_id}"
+        videoDict["id"] = video_id
+
+
+    videoDict["titre"] = music["Artist"] + " - " + music["Title"]
+    videoDict["title"] = music["Title"]
+    videoDict["artist"] = music["Artist"]
+    videoDict["album"] = music["Album"]
+    return videoDict
 
 def insertDataVideoIntoDBB(videos):
     for video in videos:
         print(video)
-        if "title" in video:
-            response = (
-                ClientAPI.table("StatMusic3")
-                .select("*")
-                .eq("id_yt", video["id"])
-                .execute()
-            )
-            #app.cur.execute(f"SELECT * FROM public.\"StatMusic3\" WHERE id_yt='{video["id"]}'")
-            if (len(response.data)) == 0:
-                    response = (
-                        ClientAPI.table("StatMusic3")
-                        .insert({"id_yt": video["id"], "views" : 0, "Title": video["title"], "Artist": video["artist"], "Album": video["album"], "Image": video["img"]})
-                        .execute()
-                    )
-                    #app.cur.execute(f"INSERT INTO public.\"StatMusic3\" (id_yt, views, \"Title\", \"Artist\", \"Album\") VALUES ('{video["id"]}', 0, '{video["title"].replace("'", '"')}', '{video["artist"].replace("'", '"')}', '{video["album"].replace("'", '"')}')")
-                    #app.conn.commit()
-                    print("video registered")
+        time.sleep(1)
+        
+        YTmusique = search1Music(video["Title"] + " - " + video["Artist"])
+        response = (
+            ClientAPI.table("StatMusic3")
+            .select("*")
+            .eq("Title", video["Title"])
+            .eq("Artist", video["Artist"])
+            .execute()
+        ) 
+
+        if (len(response.data)) == 0:
+                response = (
+                    ClientAPI.table("StatMusic3")
+                    .insert({"id_yt": YTmusique["id_yt"], "views" : 0, "Title": video["Title"], "Artist": video["Artist"], "Album": video["Album"], "Image": YTmusique["img"]})
+                    .execute()
+                )
+                print("video registered")
 
 
 def updateIncrementViews(table, col, id_yt):

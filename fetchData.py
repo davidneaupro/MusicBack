@@ -33,5 +33,4 @@ def getSimilarTrack(searchStr):
     r = requests.get('https://ws.audioscrobbler.com/2.0/', headers=headers, params=payloadGS)
     choice = random.randint(0, len(r.json()["similartracks"]["track"]))
 
-    response = r.json()["similartracks"]["track"][choice]['name'] + " - " + r.json()["similartracks"]["track"][choice]['artist']["name"]
-    return response
+    return {"Title": r.json()["similartracks"]["track"][choice]['name'], "Artist": r.json()["similartracks"]["track"][choice]['artist']["name"], "Album": album}
