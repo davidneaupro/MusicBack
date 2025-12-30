@@ -262,12 +262,10 @@ def getMusic(searchStr):
 @app.route('/searchMusic/<searchStr>')
 @jwt_required()
 def searchMusic(searchStr):
-    t0 = time.time()
     musics = getTrackSearchDeezerAll(searchStr)
     resultMusic = []
     musicToRegistered = []
     for music in musics:
-        print(time.time() - t0)
         print("title:", music["Title"])
         print("artist:", music["Artist"])
         response = (
@@ -317,8 +315,10 @@ def prepaMusic(music, YTmusique={}, withYTID=True):
     return videoDict
 
 def insertDataVideoIntoDBB(videos):
+    t0 = time.time()
     for video in videos:
         print(video)
+        print(time.time() - t0)
         time.sleep(1)
         
         YTmusique = search1Music(video["Title"] + " - " + video["Artist"])
