@@ -321,7 +321,12 @@ def insertDataVideoIntoDBB(videos):
         print("time", str(time.time() - t0))
         time.sleep(1)
         
-        YTmusique = search1Music(video["Title"] + " - " + video["Artist"])
+        try:
+            YTmusique = search1Music(video["Title"] + " - " + video["Artist"])
+        except Exception as e:
+            print(e)
+            continue
+        
         response = (
             ClientAPI.table("StatMusic3")
             .select("*")
