@@ -63,7 +63,10 @@ def getTrackSearchDeezerAll(searchStr):
     print("getTrackSearch searchStr: ", searchStr)
     result = []
     logging.info('https://api.deezer.com/search?q=' + searchStr)
-    r = requests.get('https://api.deezer.com/search?q=' + searchStr)
+    r = requests.get(
+        "https://api.deezer.com/search",
+        params={"q": searchStr}
+    )
     for music in r.json()["data"]:
         title = music["title"]
         artist = music["artist"]["name"]
