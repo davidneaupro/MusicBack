@@ -1,6 +1,8 @@
 import requests
 import re
 import logging
+import unicodedata
+import re
 
 """ API utilisé = lastFM """
 
@@ -146,3 +148,24 @@ def updateIncrement(table, col, id_yt, user, ClientAPI):
         .eq("User", user)
         .execute()
     )
+
+
+def normaliser_titre(titre: str) -> str:
+    # minuscules
+    titre = titre.lower()
+
+    # suppression des accents
+    titre = unicodedata.normalize("NFD", titre)
+    titre = "".join(c for c in titre if unicodedata.category(c) != "Mn")
+
+    # suppression des caractères spéciaux
+    titre = re.sub(r"[^a-z0-9\s]", "", titre)
+
+    # suppression des espaces multiples
+    titre = re.sub(r"\s+", " ", titre).strip()
+
+    # gestion simple du pluriel (très basique)
+    if titre.endswith("s"):
+        titre = titre[:-1]
+
+    return titre

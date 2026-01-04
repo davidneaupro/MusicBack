@@ -5,7 +5,7 @@ import json
 import threading
 import psycopg2
 import os
-from methods.tracks import getTrackSearchDeezer, getTrackSearchDeezerAll, listenMusica, loadHistoriqueRoute, loadReplayRoute
+from methods.tracks import getTrackSearchDeezer, getTrackSearchDeezerAll, listenMusica, loadHistoriqueRoute, loadReplayRoute, normaliser_titre
 from googleapiclient.discovery import build
 from flask import Flask, request, jsonify
 from flask_bcrypt import Bcrypt
@@ -281,11 +281,12 @@ def searchMusic(searchStr):
         response = (
             ClientAPI.table("StatMusic3")
             .select("*")
-            .eq("Title", music["Title"])
-            .eq("Artist", music["Artist"])
+            .ilike("Title", music["Title"])
+            .ilike("Artist", music["Artist"])
             .execute()
         )      
         if len(response.data) == 0:
+            logging.info("not in BDD")
             musicToRegistered.append(music)
             resultMusic.append(prepaMusic(music, withYTID=False))
         else:
@@ -296,12 +297,9 @@ def searchMusic(searchStr):
     thread = threading.Thread(target=insertDataVideoIntoDBB, args=(musicToRegistered,))
     thread.start()
     
-    return resultMusic
+    return normaliserLesTitres(resultMusic)
     
 def prepaMusic(music, YTmusique={}, withYTID=True):
-    logging.info(music)
-    logging.info(YTmusique)
-
     videoDict = {}
 
     if withYTID:
@@ -369,6 +367,17 @@ def updateIncrementViews(table, col, id_yt):
         .execute()
     )
 
+def normaliserLesTitres(liste):
+    resultat = []
+    vus = set()
+
+    for item in liste:
+        titre_normalise = normaliser_titre(item["titre"])
+        if titre_normalise not in vus:
+            vus.add(titre_normalise)
+            resultat.append(item)
+
+    return resultat
 
 # Lancer l'application
 if __name__ == "__main__":
