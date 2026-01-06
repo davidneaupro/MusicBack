@@ -340,8 +340,8 @@ def insertDataVideoIntoDBB(videos):
             .eq("Artist", video["Artist"])
             .execute()
         ) 
-
-        if (len(response.data)) == 0:
+ 
+        if (len(response.data)) == 0 :
             try:
                 response = (
                     ClientAPI.table("StatMusic3")
